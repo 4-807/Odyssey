@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            background-color: #ffffff;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .message{ background: rgba(0, 0, 0, 0.47);float: right;width:200px;height:250px;padding:5px;color: #ffffff;
+            alignment: right;margin: 10px;right: 0;
+            position: absolute}
+
+        .blood{background: rgba(155, 155, 155, 0.2);
+            width: 33.3%;
+            height: 30px;
+            position: absolute;
+            left: 33.3%;
+            bottom: 20px;
+            border: 2px solid #ffffff;
+        }
+
+        #blood-text{
+            position: absolute;
+            left: 48%;
+            color: white;
+            bottom: 27px;
+            /*border-bottom: 2px solid #ffffff;*/
+        }
+        #blood-bar{
+            background:rgba(255, 66, 66, 0.6);width:33.3%;height:30px;bottom: 20px;position: absolute;left: 33.3%;
+            border-left: 2px solid #ffffff;
+            border-top: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+        }
+
+        .clip{background: rgba(155, 155, 155, 0.2);
+            width: 16%;
+            height: 30px;
+            position: absolute;
+            left: 68%;
+            bottom: 20px;
+            border: 2px solid #ffffff;
+        }
+
+        #clip-text{
+            position: absolute;
+            left: 75%;
+            color: white;
+            bottom: 27px;
+            /*border-bottom: 2px solid #ffffff;*/
+        }
+        #clip-bar{
+            background:rgba(66, 66, 255, 0.6);width:16%;height:30px;bottom: 20px;position: absolute;left: 68%;
+            border-left: 2px solid #ffffff;
+            border-top: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+        }
+
+        #quit{
+            position: absolute;
+            left: 48%;
+            top: 60%;
+            font-size: xx-large;
+            color: #ff341b;
+            background-color: antiquewhite;
+            z-index: 1000;
+            cursor: pointer;
+        }
+
+        #gun_sight{
+            position: absolute;
+            z-Index: 990;
+            display: none;
+        }
+
+        #gun_sight_a{
+            position: absolute;
+            z-Index: 991;
+            display: none;
+        }
+
+        #kill_logo{
+            position: absolute;
+            z-Index: 992;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="message" id="rank-list">排行榜：</br></div>
+<div id="msg-board" class="message" style="overflow:auto;bottom: 100px" >
+    消息：</br>
+
+</div>
+
+<div class="m-text" style="margin:10px; right:0; width:200px; bottom: 50px;position: absolute">
+    <textarea id="msg" placeholder="按 Enter 发送"  hidden="true"></textarea>
+</div>
+
+<div class="blood" ></div>
+<div id="blood-bar" ></div>
+<div id="blood-text">100/100</div>
+
+<div class="clip" ></div>
+<div id="clip-bar" ></div>
+<div id="clip-text">30/∞</div>
+
+<div id="quit">exit</div>
+
+<img id="gun_sight" src="img/zx2.png">
+<img id="gun_sight_a" src="img/zx3.png">
+<img id="kill_logo" src="img/kill.png">
+
+</body>
+<script src="https://cdn.bootcss.com/three.js/92/three.min.js"></script>
+<script src="lib/inflate.min.js"></script>
+<script src="lib/FBXLoader.js"></script>
+<script src="lib/Detector.js"></script>
+<script src="lib/stats.min.js"></script>
+<script src="https://cdn.bootcss.com/socket.io/2.0.4/socket.io.js"></script>
+<script src="js/ThirdPersonControls.js"></script>
+<script src="js/PointerLock.js"></script>
+<script src="js/Hero.js"></script>
+<script src="js/Laser.js"></script>
+<script src="js/Player.js"></script>
+<script src="js/Chat.js"></script>
+<script src="js/LaserSound.js"></script>
+<script src="js/Scene.js"></script>
+<script src="js/Map.js"></script>
+<script src="js/Socket.js"></script>
+<script>
+    var lock = new PointerLock("Click to play",
+        "(ESC=Menu, " +
+        "WASD=Move, " +
+        "SPACE=Jump, " +
+        "MOUSE-LEFT=Shoot, " +
+        "MOUSE-RIGHT=Aim, " +
+        "R=Reload clip, " +
+        "ENTER=Message)");
+
+    // var id = Math.floor(Math.random() * 1000);
+    var id = getUrlParam('userid');
+    var renderer, scene, camera, audioListener, controls, light, light1, ball, gunSight, gunSight_a, killLogo;
+    var objects = [];
+    var lasers = [];
+    var hero;
+    var fireTid;
+    var players = [];
+
+    var socket = null;
+
+    var prevTime = performance.now();
+
+    function getStyle(obj, styleName){
+        if(obj.currentStyle){
+            return obj.currentStyle[styleName];
+        }else{
+            return getComputedStyle(obj,null)[styleName];
+        }
+    }
+
+    function getUrlParam(name) {
+        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)"); //构造一个含有目标参数的正则表达式对象
+        var r = window.location.search.substr(1).match(reg);  //匹配目标参数
+        if (r != null) return unescape(r[2]); return null; //返回参数值
+    }
+
+    function onWindowResize() {
+        initGunSight();
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+    }
+
+    function initHero() {
+        camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 1, 1000);
+        audioListener = new THREE.AudioListener();
+        controls = new ThirdPersonControls(camera);
+        controls.setZ(13.5);
+
+        hero = new Hero(scene, 6, 20.5, 22, audioListener);
+        hero.loadModel();
+        hero.setControls(controls);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (!lock.locked())
+            controls.enabled = true;
+
+        var time = performance.now();
+        var delta = ( time - prevTime ) / 1000;
+        prevTime = time;
+
+        if (hero.loaded) {
+            if (delta < 0.05) {
+                if (hero.enabled) {
+                    hero.updateVelocity(delta);
+                }
+                hero.passTime(delta);
+                hero.crash(objects);
+                hero.move(delta);
+            }
+            else {
+                var d = delta;
+                for (; d > 0; d -= 0.05) {
+                    var min = Math.min(0.05, d);
+                    if (hero.enabled) {
+                        hero.updateVelocity(min);
+                    }
+                    hero.passTime(min);
+                    hero.crash(objects);
+                    hero.move(min);
+                }
+            }
+            setClip();
+        }
+
+        updateLasers(delta);
+
+        hero.updateModel();
+        for (var i = 0; i < players.length; i++) {
+            players[i].updateModel();
+        }
+
+        var opacity = getStyle(killLogo, 'opacity');
+        if (opacity > 0) {
+            killLogo.style.opacity = (opacity - Math.min(opacity, delta/2)) + "";
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    function init() {
+        initRender();
+        initScene();
+        initSounds();
+        initLight();
+        initHero();
+        initListener();
+        initGunSight();
+        initMap();
+        initSocket();
+
+        animate();
+        window.addEventListener( 'resize', onWindowResize, false );
+    }
+
+    init();
+
+</script>
+</html>
