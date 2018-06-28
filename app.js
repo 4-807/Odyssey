@@ -6,15 +6,15 @@ var mysql = require('mysql');
 
 server.listen(3000);
 
-/*
- var connection = mysql.createConnection({
- host     : 'localhost',
- user     : 'root',
- password : 'root',
- database : 'shooting'
- });
- connection.connect();
- */
+
+var connection = mysql.createConnection({
+    host     : 'localhost',
+    user     : 'root',
+    password : 'root',
+    database : 'shooting'
+});
+
+connection.connect();
 
 var THREE = require('three');
 
@@ -138,12 +138,15 @@ function removeRoom(roomID) {
 }
 
 function writeData(socketID, player) {
-    /*
-     connection.query('SELECT * FROM users', function (error, results, fields) {
-     if (error) throw error;
-     console.log('The solution is: ', results[0]);
-     });
-     */
+
+    var sql = "INSERT INTO records VALUES (" + socketID + ", '" + player.id + "', " + 
+        player.maxScore + ", " + player.maxKills + ")";
+    console.log(sql);
+    connection.query(sql, function (error, results, fields) {
+        if (error) throw error;
+        console.log('The solution is: ', results[0]);
+    });
+
 }
 
 function quitPlayer(socketID) {
